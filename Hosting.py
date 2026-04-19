@@ -2665,7 +2665,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await terminal_callback(update, context)
 
 # ═══════════════════════════════════════════════════════════════
-# MAIN FUNCTION
+# MAIN FUNCTION - ALTERNATIVE FIX FOR PYTHON 3.14
 # ═══════════════════════════════════════════════════════════════
 
 def main():
@@ -2676,9 +2676,14 @@ def main():
     print(f"📁 User files: {USER_FILES_DIR}")
     print("="*50 + "\n")
 
+    # Build application
     application = (
         Application.builder()
         .token(BOT_TOKEN)
+        .connect_timeout(30)
+        .read_timeout(30)
+        .write_timeout(30)
+        .pool_timeout(30)
         .build()
     )
 
@@ -2687,16 +2692,15 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(handle_callback))
 
-    try:
-        application.run_polling()
-    except Exception as e:
-        logger.error(f"Bot stopped: {e}")
-    finally:
-        try:
-            application.shutdown()
-        except:
-            pass
-
+    print("✅ Bot starting...")
+    
+    # Run with polling - use run_polling() directly
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
+    try:
+        import nest_asyncio
+        nest_asyncio.apply()
+    except:
+        pass
     main()
