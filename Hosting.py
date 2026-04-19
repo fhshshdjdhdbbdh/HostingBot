@@ -2665,58 +2665,88 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await terminal_callback(update, context)
 
 # ═══════════════════════════════════════════════════════════════
-# MAIN FUNCTION - RENDER COMPATIBLE FIX
+# RENDER WEB SERVICE FIX - DUMMY HTTP SERVER
 # ═══════════════════════════════════════════════════════════════
 
+import threading
 import traceback
 import signal
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-def main():
-    """Main function with proper error handling for Render"""
-    try:
-        print("\n" + "="*50)
-        print("🌺 UNIVERSAL HOSTING BOT 🌺")
-        print("="*50)
-        print(f"💾 Database: {SQLITE_DB}")
-        print(f"📁 User files: {USER_FILES_DIR}")
-        print("="*50 + "\n")
-        sys.stdout.flush()
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'Bot is running!')
+    
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+    
+    def log_message(self, format, *args):
+        # Disable HTTP logs to keep console clean
+        pass
 
-        # Build application with minimal settings
-        application = (
-            Application.builder()
-            .token(BOT_TOKEN)
-            .build()
-        )
+def start_dummy_server():
+    """Render ko satisfy karne ke liye ek dummy port open karna"""
+    port = int(os.environ.get('PORT', 10000))
+    server = HTTPServer(('0.0.0.0', port), DummyHandler)
+    print(f"🌐 Dummy HTTP server running on port {port}")
+    server.serve_forever()
 
-        # Add handlers
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        application.add_handler(CallbackQueryHandler(handle_callback))
+async def start_bot():
+    """Bot ko start karne ka function"""
+    print("\n" + "="*50)
+    print("🌺 UNIVERSAL HOSTING BOT 🌺")
+    print("="*50)
+    print(f"💾 Database: {SQLITE_DB}")
+    print(f"📁 User files: {USER_FILES_DIR}")
+    print("="*50 + "\n")
 
-        print("✅ Bot starting...")
-        sys.stdout.flush()
-        
-        # Run the bot - this will block
-        application.run_polling(drop_pending_updates=True)
-        
-    except Exception as e:
-        print(f"❌ FATAL ERROR: {e}")
-        traceback.print_exc()
-        sys.stdout.flush()
-        sys.exit(1)
+    application = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .connect_timeout(30)
+        .read_timeout(30)
+        .write_timeout(30)
+        .build()
+    )
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CallbackQueryHandler(handle_callback))
+
+    print("✅ Bot is starting...")
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling(drop_pending_updates=True)
+    print("✅ Bot is polling...")
+    
+    # Bot ko forever run karne ke liye
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
-    # Set up signal handlers for graceful shutdown
+    # Signal handlers for graceful shutdown
     signal.signal(signal.SIGTERM, lambda sig, frame: sys.exit(0))
     signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(0))
     
-    # Apply nest_asyncio if available
     try:
         import nest_asyncio
         nest_asyncio.apply()
     except:
         pass
+
+    # 1. Dummy HTTP Server ko background thread mein start karo
+    server_thread = threading.Thread(target=start_dummy_server, daemon=True)
+    server_thread.start()
     
-    main()
+    # 2. Bot ko main thread mein start karo
+    try:
+        asyncio.run(start_bot())
+    except KeyboardInterrupt:
+        print("\n🛑 Bot stopped by user")
+    except Exception as e:
+        print(f"\n❌ Bot error: {e}")
+        traceback.print_exc()
