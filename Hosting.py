@@ -2665,15 +2665,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await terminal_callback(update, context)
 
 # ═══════════════════════════════════════════════════════════════
-# RENDER WEB SERVICE FIX - DUMMY HTTP SERVER
+# RENDER WEB SERVICE FIXED VERSION (PYTHON 3.11 COMPATIBLE)
 # ═══════════════════════════════════════════════════════════════
 
 import threading
-import traceback
 import signal
+import asyncio
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 class DummyHandler(BaseHTTPRequestHandler):
+    """Minimal HTTP handler to satisfy Render's port binding requirement."""
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
@@ -2684,18 +2685,18 @@ class DummyHandler(BaseHTTPRequestHandler):
         self.end_headers()
     
     def log_message(self, format, *args):
-        # Disable HTTP logs to keep console clean
+        # Silence HTTP logs to keep console clean
         pass
 
 def start_dummy_server():
-    """Render ko satisfy karne ke liye ek dummy port open karna"""
+    """Starts a dummy HTTP server to bind to the PORT Render expects."""
     port = int(os.environ.get('PORT', 10000))
     server = HTTPServer(('0.0.0.0', port), DummyHandler)
     print(f"🌐 Dummy HTTP server running on port {port}")
     server.serve_forever()
 
 async def start_bot():
-    """Bot ko start karne ka function"""
+    """Starts the Telegram bot with proper Python 3.11+ compatibility."""
     print("\n" + "="*50)
     print("🌺 UNIVERSAL HOSTING BOT 🌺")
     print("="*50)
@@ -2703,6 +2704,7 @@ async def start_bot():
     print(f"📁 User files: {USER_FILES_DIR}")
     print("="*50 + "\n")
 
+    # Build application (works fine with Python 3.11)
     application = (
         Application.builder()
         .token(BOT_TOKEN)
@@ -2712,6 +2714,7 @@ async def start_bot():
         .build()
     )
 
+    # Add all handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -2720,33 +2723,49 @@ async def start_bot():
     print("✅ Bot is starting...")
     await application.initialize()
     await application.start()
+    
+    # Start polling – use the stable method for Python 3.11
     await application.updater.start_polling(drop_pending_updates=True)
-    print("✅ Bot is polling...")
     
-    # Bot ko forever run karne ke liye
-    while True:
-        await asyncio.sleep(3600)
-
-if __name__ == "__main__":
-    # Signal handlers for graceful shutdown
-    signal.signal(signal.SIGTERM, lambda sig, frame: sys.exit(0))
-    signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(0))
+    print("✅ Bot is polling! (Press Ctrl+C to stop)")
     
+    # Keep the bot running forever
     try:
-        import nest_asyncio
-        nest_asyncio.apply()
-    except:
-        pass
+        while True:
+            await asyncio.sleep(3600)
+    except asyncio.CancelledError:
+        print("⏹️ Bot shutting down...")
+        await application.updater.stop()
+        await application.stop()
+        await application.shutdown()
 
-    # 1. Dummy HTTP Server ko background thread mein start karo
+def main():
+    """Main entry point – starts dummy HTTP server and the bot."""
+    # Start dummy HTTP server in a background thread (Render requirement)
     server_thread = threading.Thread(target=start_dummy_server, daemon=True)
     server_thread.start()
     
-    # 2. Bot ko main thread mein start karo
+    # Run the bot
     try:
         asyncio.run(start_bot())
     except KeyboardInterrupt:
         print("\n🛑 Bot stopped by user")
     except Exception as e:
-        print(f"\n❌ Bot error: {e}")
+        print(f"\n❌ Fatal bot error: {e}")
+        import traceback
         traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    # Attempt to apply nest_asyncio if available (optional)
+    try:
+        import nest_asyncio
+        nest_asyncio.apply()
+    except ImportError:
+        pass
+    
+    # Handle termination signals gracefully
+    signal.signal(signal.SIGTERM, lambda sig, frame: sys.exit(0))
+    signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(0))
+    
+    main()
