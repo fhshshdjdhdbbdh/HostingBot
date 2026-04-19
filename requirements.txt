@@ -1,3 +1,6 @@
 python-telegram-bot==20.7
-nest-asyncio
 psutil
+nest-asyncio
+GPUtil
+nbformat
+nbconvert
