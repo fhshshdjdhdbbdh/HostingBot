@@ -2665,42 +2665,58 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await terminal_callback(update, context)
 
 # ═══════════════════════════════════════════════════════════════
-# MAIN FUNCTION - ALTERNATIVE FIX FOR PYTHON 3.14
+# MAIN FUNCTION - RENDER COMPATIBLE FIX
 # ═══════════════════════════════════════════════════════════════
 
+import traceback
+import signal
+
 def main():
-    print("\n" + "="*50)
-    print("🌺 UNIVERSAL HOSTING BOT 🌺")
-    print("="*50)
-    print(f"💾 Database: {SQLITE_DB}")
-    print(f"📁 User files: {USER_FILES_DIR}")
-    print("="*50 + "\n")
+    """Main function with proper error handling for Render"""
+    try:
+        print("\n" + "="*50)
+        print("🌺 UNIVERSAL HOSTING BOT 🌺")
+        print("="*50)
+        print(f"💾 Database: {SQLITE_DB}")
+        print(f"📁 User files: {USER_FILES_DIR}")
+        print("="*50 + "\n")
+        sys.stdout.flush()
 
-    # Build application
-    application = (
-        Application.builder()
-        .token(BOT_TOKEN)
-        .connect_timeout(30)
-        .read_timeout(30)
-        .write_timeout(30)
-        .pool_timeout(30)
-        .build()
-    )
+        # Build application with minimal settings
+        application = (
+            Application.builder()
+            .token(BOT_TOKEN)
+            .build()
+        )
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(CallbackQueryHandler(handle_callback))
+        # Add handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_handler(CallbackQueryHandler(handle_callback))
 
-    print("✅ Bot starting...")
-    
-    # Run with polling - use run_polling() directly
-    application.run_polling(drop_pending_updates=True)
+        print("✅ Bot starting...")
+        sys.stdout.flush()
+        
+        # Run the bot - this will block
+        application.run_polling(drop_pending_updates=True)
+        
+    except Exception as e:
+        print(f"❌ FATAL ERROR: {e}")
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.exit(1)
 
 if __name__ == "__main__":
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, lambda sig, frame: sys.exit(0))
+    signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(0))
+    
+    # Apply nest_asyncio if available
     try:
         import nest_asyncio
         nest_asyncio.apply()
     except:
         pass
+    
     main()
