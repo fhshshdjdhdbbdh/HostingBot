@@ -2668,7 +2668,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MAIN FUNCTION
 # ═══════════════════════════════════════════════════════════════
 
-async def main():
+def main():
     print("\n" + "="*50)
     print("🌺 UNIVERSAL HOSTING BOT 🌺")
     print("="*50)
@@ -2679,12 +2679,6 @@ async def main():
     application = (
         Application.builder()
         .token(BOT_TOKEN)
-        .get_updates_connect_timeout(30)
-        .get_updates_read_timeout(30)
-        .get_updates_write_timeout(30)
-        .connect_timeout(30)
-        .read_timeout(30)
-        .write_timeout(30)
         .build()
     )
 
@@ -2694,19 +2688,15 @@ async def main():
     application.add_handler(CallbackQueryHandler(handle_callback))
 
     try:
-        await application.run_polling(close_loop=False)
+        application.run_polling()
     except Exception as e:
         logger.error(f"Bot stopped: {e}")
     finally:
         try:
-            await application.shutdown()
+            application.shutdown()
         except:
             pass
 
+
 if __name__ == "__main__":
-    try:
-        import nest_asyncio
-        nest_asyncio.apply()
-    except:
-        pass
-    asyncio.run(main())
+    main()
